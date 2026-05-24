@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>مواقع الصيد – الكويت</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    :root{
+      --ocean:#0a1628;--deep:#061020;--teal:#00c9b1;
+      --gold:#f5c842;--wave:#1a3a5c;--card:#0f2340;
+      --text:#e8f4f8;--muted:#7aafc8;
+    }
+    body{font-family:'Tajawal',sans-serif;background:var(--ocean);color:var(--text);height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+
+    /* HEADER */
+    header{
+      background:rgba(6,16,32,0.97);
+      border-bottom:1px solid rgba(0,201,177,0.2);
+      padding:12px 16px;
+      display:flex;align-items:center;gap:10px;
+      flex-shrink:0;
+    }
+    .logo{font-size:1.6rem;}
+    header h1{font-size:1.1rem;font-weight:900;color:var(--teal);}
+    header p{font-size:0.7rem;color:var(--muted);}
+
+    /* TABS */
+    .tabs{
+      display:flex;
+      background:var(--deep);
+      border-bottom:1px solid rgba(0,201,177,0.1);
+      flex-shrink:0;
+    }
+    .tab{
+      flex:1;padding:11px 8px;text-align:center;font-family:'Tajawal',sans-serif;
+      font-size:0.82rem;font-weight:700;color:var(--muted);background:none;border:none;
+      cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;
+    }
+    .tab.active{color:var(--teal);border-bottom-color:var(--teal);}
+
+    /* PANELS */
+    .panel{display:none;flex:1;overflow:hidden;flex-direction:column;}
+    .panel.active{display:flex;}
+
+    /* MAP PANEL */
+    #mapPanel{position:relative;}
+    #map{flex:1;width:100%;}
+
+    /* Coords bar floating on map */
+    .coords-float{
+      position:absolute;top:10px;left:50%;transform:translateX(-50%);
+      z-index:1000;
+      background:rgba(6,16,32,0.9);
+      border:1px solid rgba(0,201,177,0.4);
+      border-radius:20px;padding:6px 16px;
+      font-size:0.78rem;color:var(--teal);font-weight:700;
+      direction:ltr;white-space:nowrap;
+      backdrop-filter:blur(6px);
+      pointer-events:none;
+    }
+    .coords-float span{color:var(--gold);}
+
+    /* Tap hint */
+    .tap-hint{
+      position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+      z-index:1000;
+      background:rgba(6,16,32,0.88);
+      border:1px solid rgba(245,200,66,0.3);
+      border-radius:20px;padding:7px 18px;
+      font-size:0.78rem;color:var(--gold);font-weight:700;
+      white-space:nowrap;
+      backdrop-filter:blur(6px);
+    }
+
+    /* ADD PANEL */
+    #addPanel{overflow-y:auto;padding:16px;}
+    #addPanel::-webkit-scrollbar{display:none;}
+
+    .coords-picked{
+      background:rgba(0,201,177,0.1);
+      border:1.5px solid rgba(0,201,177,0.35);
+      border-radius:12px;padding:12px 14px;
+      margin-bottom:14px;text-align:center;
+    }
+    .coords-picked .lbl{font-size:0.7rem;color:var(--muted);margin-bottom:4px;}
+    .coords-picked .val{font-size:1.1rem;font-weight:900;color:var(--teal);font-family:monospace;direction:ltr;}
+    .coords-picked .sub{font-size:0.68rem;color:var(--muted);margin-top:3px;}
+
+    .field{margin-bottom:12px;}
+    .field label{display:block;font-size:0.75rem;color:var(--muted);margin-bottom:4px;font-weight:700;}
+    .field input,.field textarea{
+      width:100%;background:var(--wave);border:1px solid rgba(0,201,177,0.15);
+      border-radius:10px;color:var(--text);font-family:'Tajawal',sans-serif;
+      font-size:0.9rem;padding:10px 13px;outline:none;
+      -webkit-appearance:none;
+    }
+    .field input:focus,.field textarea:focus{border-color:var(--teal);}
+    .field textarea{resize:none;height:70px;}
+    .coord-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+    .btn-add{
+      width:100%;background:var(--teal);color:var(--deep);border:none;
+      border-radius:12px;padding:13px;font-family:'Tajawal',sans-serif;
+      font-size:1rem;font-weight:900;cursor:pointer;margin-top:4px;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .btn-tip{font-size:0.72rem;color:var(--muted);text-align:center;margin-top:10px;}
+
+    /* LIST PANEL */
+    #listPanel{overflow-y:auto;padding:12px;}
+    #listPanel::-webkit-scrollbar{display:none;}
+
+    .list-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:10px;
+    }
+    .list-header h2{font-size:0.9rem;font-weight:700;color:var(--gold);}
+    .counter{background:var(--teal);color:var(--deep);border-radius:20px;font-size:0.7rem;font-weight:900;padding:2px 9px;}
+
+    .empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.85rem;}
+    .empty-state .icon{font-size:2.5rem;margin-bottom:10px;}
+
+    .spot-card{
+      background:var(--card);border:1px solid rgba(255,255,255,0.07);
+      border-radius:14px;padding:14px;margin-bottom:10px;
+    }
+    .spot-card.active{border-color:var(--teal);}
+
+    .spot-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;}
+    .spot-name{font-weight:900;font-size:0.95rem;color:var(--text);}
+    .fish-badge{background:rgba(245,200,66,0.15);color:var(--gold);border-radius:20px;font-size:0.68rem;padding:2px 8px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+
+    /* BIG COORDS in card */
+    .spot-coords-box{
+      background:rgba(0,201,177,0.07);
+      border:1px solid rgba(0,201,177,0.2);
+      border-radius:8px;padding:8px 12px;margin-bottom:8px;
+    }
+    .coords-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+    .coord-cell .lbl{font-size:0.62rem;color:var(--muted);margin-bottom:1px;}
+    .coord-cell .val{font-size:0.95rem;font-weight:900;color:#fff;font-family:monospace;}
+
+    .spot-desc{font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:8px;}
+    .spot-actions{display:flex;gap:8px;}
+    .btn-sm{
+      flex:1;padding:8px;border-radius:8px;font-family:'Tajawal',sans-serif;
+      font-size:0.78rem;font-weight:700;cursor:pointer;border:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .btn-goto{background:rgba(0,201,177,0.15);color:var(--teal);}
+    .btn-delete{background:rgba(255,80,80,0.1);color:#ff6b6b;}
+
+    /* Leaflet popups */
+    .leaflet-popup-content-wrapper{background:var(--card)!important;border:1px solid rgba(0,201,177,0.3)!important;border-radius:12px!important;box-shadow:0 8px 32px rgba(0,0,0,0.5)!important;}
+    .leaflet-popup-content{color:var(--text)!important;font-family:'Tajawal',sans-serif!important;margin:12px 16px!important;}
+    .leaflet-popup-tip{background:var(--card)!important;}
+    .popup-title{font-weight:900;font-size:1rem;color:var(--teal);margin-bottom:4px;}
+    .popup-fish{color:var(--gold);font-size:0.8rem;margin-bottom:6px;}
+    .popup-coords{font-size:0.78rem;color:#aaa;font-family:monospace;direction:ltr;background:rgba(0,201,177,0.08);padding:4px 8px;border-radius:6px;margin-top:6px;}
+
+    /* Toast */
+    .toast{
+      position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);
+      background:var(--teal);color:var(--deep);padding:10px 22px;
+      border-radius:30px;font-weight:700;font-size:0.88rem;z-index:9999;
+      transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);pointer-events:none;
+      white-space:nowrap;
+    }
+    .toast.show{transform:translateX(-50%) translateY(0);}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎣</div>
+  <div>
+    <h1>مواقع الصيد – الكويت</h1>
+    <p>أضف وشارك إحداثيات الصيد</p>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('map')">🗺️ الخريطة</button>
+  <button class="tab" onclick="switchTab('add')">➕ أضف موقع</button>
+  <button class="tab" id="listTab" onclick="switchTab('list')">📋 المواقع <span class="counter" id="spotCount">0</span></button>
+</div>
+
+<!-- MAP PANEL -->
+<div class="panel active" id="mapPanel">
+  <div class="coords-float" id="coordsFloat">📍 اضغط على الخريطة لتحديد موقع</div>
+  <div id="map"></div>
+  <div class="tap-hint">👆 اضغط على الخريطة لاختيار نقطة</div>
+</div>
+
+<!-- ADD PANEL -->
+<div class="panel" id="addPanel">
+  <div class="coords-picked" id="coordsPicked">
+    <div class="lbl">📍 الإحداثيات</div>
+    <div class="val" id="coordsPickedVal">اكتب الأرقام في الخانات أدناه</div>
+    <div class="sub">أو اضغط على الخريطة لتحديد الموقع تلقائياً</div>
+  </div>
+
+  <div class="field">
+    <label>اسم الموقع</label>
+    <input type="text" id="spotName" placeholder="مثال: جزيرة فيلكا الشمالية"/>
+  </div>
+  <div class="field coord-row">
+    <div>
+      <label>خط العرض (Lat)</label>
+      <input type="number" id="spotLat" placeholder="29.5000" step="0.00001" inputmode="decimal"/>
+    </div>
+    <div>
+      <label>خط الطول (Lng)</label>
+      <input type="number" id="spotLng" placeholder="48.0000" step="0.00001" inputmode="decimal"/>
+    </div>
+  </div>
+  <div class="field">
+    <label>أنواع السمك</label>
+    <input type="text" id="spotFish" placeholder="مثال: هامور، سبيطي، زبيدي"/>
+  </div>
+  <div class="field">
+    <label>ملاحظات (اختياري)</label>
+    <textarea id="spotDesc" placeholder="مثال: أفضل وقت الصبح، عمق 8 متر..."></textarea>
+  </div>
+  <button class="btn-add" onclick="addSpot()">📍 أضف الموقع</button>
+  <div class="btn-tip">💡 يمكنك كتابة الإحداثيات يدوياً إذا تعرفها</div>
+</div>
+
+<!-- LIST PANEL -->
+<div class="panel" id="listPanel">
+  <div class="list-header">
+    <h2>🎣 مواقع الصيد المسجّلة</h2>
+  </div>
+  <div id="spotsList">
+    <div class="empty-state">
+      <div class="icon">🌊</div>
+      <p>ما في مواقع بعد<br/>أضف أول موقع من تبويب الإضافة!</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── MAP ──
+  const map = L.map('map',{zoomControl:true}).setView([29.3,47.9],9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+
+  function makeIcon(){
+    return L.divIcon({
+      className:'',
+      html:`<div style="width:26px;height:26px;background:#00c9b1;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(0,0,0,0.4)"></div>`,
+      iconSize:[26,26],iconAnchor:[13,26],popupAnchor:[0,-28]
+    });
+  }
+
+  // ── STATE ──
+  let spots = [];
+  try { spots = JSON.parse(localStorage.getItem('fishingSpots') || '[]'); } catch(e){ spots = []; }
+  let markers = {};
+  let activeId = null;
+  let tempMarker = null;
+
+  function save(){
+    try { localStorage.setItem('fishingSpots', JSON.stringify(spots)); } catch(e){}
+  }
+
+  // ── TABS ──
+  function switchTab(tab){
+    document.querySelectorAll('.tab').forEach((t,i)=>{
+      t.classList.toggle('active', ['map','add','list'][i]===tab);
+    });
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById(tab+'Panel').classList.add('active');
+    if(tab==='map') setTimeout(()=>map.invalidateSize(),50);
+  }
+
+  // ── COORDS on map tap ──
+  map.on('click',(e)=>{
+    const lat = e.latlng.lat.toFixed(5);
+    const lng = e.latlng.lng.toFixed(5);
+
+    document.getElementById('spotLat').value = lat;
+    document.getElementById('spotLng').value = lng;
+    document.getElementById('coordsPickedVal').textContent = lat + ' , ' + lng;
+    document.getElementById('coordsFloat').innerHTML =
+      `✅ خط العرض: <span>${lat}</span> | خط الطول: <span>${lng}</span>`;
+
+    if(tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker([lat,lng],{
+      icon: L.divIcon({
+        className:'',
+        html:`<div style="width:22px;height:22px;background:#f5c842;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,
+        iconSize:[22,22],iconAnchor:[11,11]
+      })
+    }).addTo(map);
+
+    showToast('📍 تم تحديد الموقع! روح لـ ➕ وأضف بياناته');
+  });
+
+  // ── RENDER ──
+  function render(){
+    const list = document.getElementById('spotsList');
+    document.getElementById('spotCount').textContent = spots.length;
+    Object.values(markers).forEach(m=>map.removeLayer(m));
+    markers={};
+
+    if(spots.length===0){
+      list.innerHTML=`<div class="empty-state"><div class="icon">🌊</div><p>ما في مواقع بعد<br/>أضف أول موقع من تبويب الإضافة!</p></div>`;
+      return;
+    }
+    list.innerHTML='';
+
+    spots.forEach(spot=>{
+      const marker=L.marker([spot.lat,spot.lng],{icon:makeIcon()})
+        .addTo(map)
+        .bindPopup(`
+          <div class="popup-title">🎣 ${spot.name}</div>
+          ${spot.fish?`<div class="popup-fish">🐟 ${spot.fish}</div>`:''}
+          <div class="popup-coords">Lat: ${spot.lat}<br/>Lng: ${spot.lng}</div>
+          ${spot.desc?`<div style="font-size:0.8rem;color:#aaa;margin-top:6px">${spot.desc}</div>`:''}
+        `);
+      marker.on('click',()=>setActive(spot.id));
+      markers[spot.id]=marker;
+
+      const card=document.createElement('div');
+      card.className='spot-card'+(activeId===spot.id?' active':'');
+      card.id='card-'+spot.id;
+      card.innerHTML=`
+        <div class="spot-top">
+          <div class="spot-name">📍 ${spot.name}</div>
+          ${spot.fish?`<span class="fish-badge">🐟 ${spot.fish}</span>`:''}
+        </div>
+        <div class="spot-coords-box">
+          <div class="coords-grid">
+            <div class="coord-cell">
+              <div class="lbl">خط العرض (Lat)</div>
+              <div class="val">${spot.lat}</div>
+            </div>
+            <div class="coord-cell">
+              <div class="lbl">خط الطول (Lng)</div>
+              <div class="val">${spot.lng}</div>
+            </div>
+          </div>
+        </div>
+        ${spot.desc?`<div class="spot-desc">${spot.desc}</div>`:''}
+        <div class="spot-actions">
+          <button class="btn-sm btn-goto" onclick="flyTo('${spot.id}')">🗺️ على الخريطة</button>
+          <button class="btn-sm btn-delete" onclick="deleteSpot('${spot.id}')">🗑️ حذف</button>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function setActive(id){
+    activeId=id;
+    document.querySelectorAll('.spot-card').forEach(c=>c.classList.remove('active'));
+    const card=document.getElementById('card-'+id);
+    if(card){card.classList.add('active');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
+    if(markers[id]) markers[id].openPopup();
+  }
+
+  function flyTo(id){
+    const spot=spots.find(s=>s.id===id);
+    if(!spot) return;
+    switchTab('map');
+    setTimeout(()=>{
+      map.flyTo([spot.lat,spot.lng],14,{duration:1.2});
+      setActive(id);
+    },80);
+  }
+
+  function addSpot(){
+    const name=document.getElementById('spotName').value.trim();
+    const lat=parseFloat(document.getElementById('spotLat').value);
+    const lng=parseFloat(document.getElementById('spotLng').value);
+    const fish=document.getElementById('spotFish').value.trim();
+    const desc=document.getElementById('spotDesc').value.trim();
+
+    if(!name) return showToast('⚠️ أدخل اسم الموقع');
+    if(isNaN(lat)||isNaN(lng)) return showToast('⚠️ أدخل خط العرض وخط الطول');
+
+    if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
+
+    const spot={id:Date.now().toString(),name,lat,lng,fish,desc};
+    spots.push(spot);
+    save();
+    render();
+    showToast('✅ تم إضافة الموقع!');
+    ['spotName','spotLat','spotLng','spotFish','spotDesc'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('coordsPickedVal').textContent='-- لم تختر موقع بعد --';
+    switchTab('list');
+  }
+
+  function deleteSpot(id){
+    if(!confirm('تبي تحذف هذا الموقع؟')) return;
+    spots=spots.filter(s=>s.id!==id);
+    if(activeId===id) activeId=null;
+    save();
+    render();
+    showToast('🗑️ تم الحذف');
+  }
+
+  function showToast(msg){
+    const t=document.getElementById('toast');
+    t.textContent=msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),2800);
+  }
+
+  render();
+</script>
+</body>
+</html>
