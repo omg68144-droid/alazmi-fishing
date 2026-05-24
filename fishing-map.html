@@ -200,9 +200,9 @@
 <!-- ADD PANEL -->
 <div class="panel" id="addPanel">
   <div class="coords-picked" id="coordsPicked">
-    <div class="lbl">📍 الإحداثيات المختارة من الخريطة</div>
-    <div class="val" id="coordsPickedVal">-- لم تختر موقع بعد --</div>
-    <div class="sub">روح للخريطة واضغط على الموقع أولاً</div>
+    <div class="lbl">📍 الإحداثيات</div>
+    <div class="val" id="coordsPickedVal">اكتب الأرقام في الخانات أدناه</div>
+    <div class="sub">أو اضغط على الخريطة لتحديد الموقع تلقائياً</div>
   </div>
 
   <div class="field">
@@ -259,11 +259,16 @@
     });
   }
 
-  // ── STATE (in-memory) ──
+  // ── STATE ──
   let spots = [];
+  try { spots = JSON.parse(localStorage.getItem('fishingSpots') || '[]'); } catch(e){ spots = []; }
   let markers = {};
   let activeId = null;
   let tempMarker = null;
+
+  function save(){
+    try { localStorage.setItem('fishingSpots', JSON.stringify(spots)); } catch(e){}
+  }
 
   // ── TABS ──
   function switchTab(tab){
@@ -379,13 +384,13 @@
     const desc=document.getElementById('spotDesc').value.trim();
 
     if(!name) return showToast('⚠️ أدخل اسم الموقع');
-    if(isNaN(lat)||isNaN(lng)) return showToast('⚠️ اضغط على الخريطة أو أدخل الإحداثيات');
-    if(lat<27||lat>31||lng<45||lng>50) return showToast('⚠️ الإحداثيات خارج منطقة الكويت');
+    if(isNaN(lat)||isNaN(lng)) return showToast('⚠️ أدخل خط العرض وخط الطول');
 
     if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
 
     const spot={id:Date.now().toString(),name,lat,lng,fish,desc};
     spots.push(spot);
+    save();
     render();
     showToast('✅ تم إضافة الموقع!');
     ['spotName','spotLat','spotLng','spotFish','spotDesc'].forEach(id=>document.getElementById(id).value='');
@@ -397,6 +402,7 @@
     if(!confirm('تبي تحذف هذا الموقع؟')) return;
     spots=spots.filter(s=>s.id!==id);
     if(activeId===id) activeId=null;
+    save();
     render();
     showToast('🗑️ تم الحذف');
   }
